@@ -61,13 +61,14 @@ router.get('/portfolio', async (req, res) => {
 // Add to portfolio
 router.post('/portfolio', async (req, res) => {
   try {
-    const { uid, symbol, name, exchange, entryPrice, quantity } = req.body;
+    const { uid, symbol, name, exchange, entryPrice, quantity, stopLoss } = req.body;
     if (!uid || !symbol || !name || !entryPrice || !quantity) {
       return res.status(400).json({ error: 'uid, symbol, name, entryPrice, quantity are required' });
     }
     const holding = new Portfolio({
       userId: uid, symbol, name, exchange: exchange || 'NSE',
       entryPrice: Number(entryPrice), quantity: Number(quantity),
+      stopLoss: Number(stopLoss) || 0,
     });
     await holding.save();
     res.status(201).json(holding);
