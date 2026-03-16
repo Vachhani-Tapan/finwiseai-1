@@ -12,6 +12,7 @@ import savingsRoutes from './routes/savingsRoutes.js';
 import aiAdvisorRoutes from './routes/aiAdvisorRoutes.js';
 import goalRoutes from './routes/goalRoutes.js';
 import alertRoutes from './routes/alertRoutes.js';
+import debtRoutes from './routes/debtRoutes.js';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.use('/api/ai-advisor', aiAdvisorRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api', portfolioRoutes);
+app.use('/api/debts', debtRoutes);
 
 
 // Database Connection & Server Start
