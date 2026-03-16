@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -213,6 +213,7 @@ export default function Expenses() {
     onError: () => toast.error("Failed to update financial profile"),
   });
 
+
   const [savingSalaryInline, setSavingSalaryInline] = useState(false);
   const handleSalaryBlur = async (val) => {
     try {
@@ -355,6 +356,33 @@ export default function Expenses() {
       monthlyChartData: chartData
     };
   }, [expenses, budgetMap, totalMonthlyBudget]);
+
+  const triggerAlert = useMutation({
+    mutationFn: async ({ category, spent, budget }) => {
+      await fetch(`${API_URL}/api/alerts`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: user.uid,
+          type: "destructive",
+          icon: "AlertTriangle",
+          title: "Budget Exceeded",
+          desc: `You've spent ₹${spent.toLocaleString()} on ${category}, exceeding your ₹${budget.toLocaleString()} budget!`,
+        }),
+      });
+    },
+  });
+
+  // Monitor for budget breaches
+  useEffect(() => {
+    categoryAggregation.forEach(cat => {
+      if (cat.budget > 0 && cat.value > cat.budget) {
+        triggerAlert.mutate({ category: cat.name, spent: cat.value, budget: cat.budget });
+        // Individual toast for immediate feedback
+        toast.error(`Budget exceeded for ${cat.name}! Check alerts.`, { id: `budget-alert-${cat.name}` });
+      }
+    });
+  }, [categoryAggregation]);
+
 
 
   const topCategory = categoryAggregation?.length > 0 ? categoryAggregation[0] : null;
@@ -559,12 +587,14 @@ export default function Expenses() {
                     <div className="flex-1">
                       <div className="flex justify-between text-sm mb-1">
                         <span className="font-medium">{c.name}</span>
-                        <span className={`text-muted-foreground ${isOver ? "text-destructive font-medium" : ""}`}>
-                          ₹{c.value.toLocaleString("en-IN")} / ₹{c.budget.toLocaleString("en-IN")}
-                          {isOver && " ⚠️"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {isOver && <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-bold">OVER BUDGET</motion.span>}
+                          <span className={`text-muted-foreground ${isOver ? "text-destructive font-bold" : ""}`}>
+                            ₹{c.value.toLocaleString("en-IN")} / ₹{c.budget.toLocaleString("en-IN")}
+                          </span>
+                        </div>
                       </div>
-                      <Progress value={pct} className="h-2" />
+                      <Progress value={pct} className={`h-2 ${isOver ? "bg-destructive/20 [&>div]:bg-destructive" : ""}`} />
                     </div>
                   </div>
                 );

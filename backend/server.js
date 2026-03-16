@@ -11,6 +11,7 @@ import netWorthRoutes from './routes/netWorthRoutes.js';
 import savingsRoutes from './routes/savingsRoutes.js';
 import aiAdvisorRoutes from './routes/aiAdvisorRoutes.js';
 import goalRoutes from './routes/goalRoutes.js';
+import alertRoutes from './routes/alertRoutes.js';
 
 dotenv.config();
 
@@ -25,8 +26,8 @@ app.use((req, res, next) => {
 // Middleware
 app.use(cors({
   origin: (origin, callback) => {
-    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
-    if (!origin || allowedOrigins.includes(origin)) {
+    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', process.env.FRONTEND_URL];
+    if (!origin || allowedOrigins.includes(origin) || (process.env.FRONTEND_URL && origin.startsWith(process.env.FRONTEND_URL))) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -47,6 +48,7 @@ app.use('/api/networth', netWorthRoutes);
 app.use('/api/savings', savingsRoutes);
 app.use('/api/ai-advisor', aiAdvisorRoutes);
 app.use('/api/goals', goalRoutes);
+app.use('/api/alerts', alertRoutes);
 app.use('/api', portfolioRoutes);
 
 
