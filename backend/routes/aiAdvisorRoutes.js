@@ -1,5 +1,5 @@
 import express from 'express';
-import Groq from 'groq-sdk';
+import { generateWithRotation, getKeyCount } from '../utils/geminiHelper.js';
 import Portfolio from '../models/Portfolio.js';
 import Expense from '../models/Expense.js';
 import Budget from '../models/Budget.js';
@@ -16,14 +16,14 @@ async function fetchStockVolatility(symbol) {
     const data = await res.json();
     const closes = data.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
     if (closes.length < 20) return { label: 'Medium', volatility: 15 };
-    
+
     // Calculate simple historical volatility
     const dailyReturns = [];
     for (let i = 1; i < closes.length; i++) {
-      if (closes[i-1] > 0) dailyReturns.push((closes[i] - closes[i-1]) / closes[i-1]);
+      if (closes[i - 1] > 0) dailyReturns.push((closes[i] - closes[i - 1]) / closes[i - 1]);
     }
     const mean = dailyReturns.reduce((s, r) => s + r, 0) / dailyReturns.length;
-    const variance = dailyReturns.reduce((s, r) => s + (r - mean)**2, 0) / dailyReturns.length;
+    const variance = dailyReturns.reduce((s, r) => s + (r - mean) ** 2, 0) / dailyReturns.length;
     const volatility = Math.sqrt(variance) * Math.sqrt(252) * 100; // Annualized
 
     let label = "Low";
@@ -40,8 +40,8 @@ router.post('/analyze', async (req, res) => {
   try {
     const { uid, message } = req.body;
     if (!uid) return res.status(400).json({ error: 'uid is required' });
-    if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
-      return res.status(500).json({ error: 'Groq API key is missing. Please configure it in .env' });
+    if (getKeyCount() === 0) {
+      return res.status(500).json({ error: 'No Gemini API keys configured. Please add GEMINI_API_KEY or GEMINI_API_KEYS in .env' });
     }
 
     // 1. Gather User's Financial Data
@@ -76,7 +76,7 @@ router.post('/analyze', async (req, res) => {
     const monthlySavings = savingsProfile?.monthlySavings || 0;
     const monthlySalary = savingsProfile?.monthlySalary || 0;
 
-    // 4. Construct the prompt for Groq
+    // 4. Construct the prompt
     const systemPrompt = `You are a professional, expert AI Financial Advisor for the FinWise App. 
 Analyze the user's financial data and answer their specific question.
 Format your response in Markdown, using bullet points and bold text for readability.
@@ -99,23 +99,20 @@ ${portfolioWithRisk.length > 0 ? portfolioWithRisk.map(p => `  - ${p.name} (${p.
 5. Keep it actionable, clear, and professional.
 6. End with a standard disclaimer: "*Disclaimer: This is AI-generated financial information, not professional advice.*"`;
 
-    // 5. Call Groq API
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    const completion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: 'You are a professional financial advisor.' },
-        { role: 'user', content: systemPrompt },
-      ],
-      model: 'llama-3.3-70b-versatile',
-    });
-
-    const aiResponse = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response.";
+    // 5. Call Google Gemini API (with automatic key rotation)
+    const aiResponse = await generateWithRotation(systemPrompt);
 
     res.json({ response: aiResponse });
 
   } catch (error) {
-    console.error('AI Advisor Error:', error);
-    res.status(500).json({ error: 'Failed to generate AI advice.' });
+    console.error('=== AI ADVISOR ERROR ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    if (error.status) console.error('Error status:', error.status);
+    if (error.errorDetails) console.error('Error details:', JSON.stringify(error.errorDetails));
+    console.error('Full error:', error);
+    console.error('========================');
+    res.status(500).json({ error: 'Failed to generate AI advice: ' + error.message });
   }
 });
 

@@ -1,5 +1,5 @@
 import express from 'express';
-import Groq from 'groq-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import Debt from '../models/Debt.js';
 import SavingsGoal from '../models/SavingsGoal.js';
 
@@ -63,9 +63,9 @@ router.post('/ai-advice', async (req, res) => {
     const { uid } = req.body;
     if (!uid) return res.status(400).json({ error: 'uid is required' });
 
-    if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here' || process.env.GROQ_API_KEY === '') {
-      console.warn('GROQ_API_KEY is not configured.');
-      return res.status(200).json({ response: "AI advice is currently unavailable. Please configure your GROQ_API_KEY in the backend environment variables." });
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here' || process.env.GEMINI_API_KEY === '') {
+      console.warn('GEMINI_API_KEY is not configured.');
+      return res.status(200).json({ response: "AI advice is currently unavailable. Please configure your GEMINI_API_KEY in the backend environment variables." });
     }
 
     const debts = await Debt.find({ userId: uid });
@@ -99,7 +99,7 @@ router.post('/ai-advice', async (req, res) => {
       } else {
         monthlyInterestCost = (d.remainingAmount * d.interestRate / 100) / 12;
       }
-      
+
       return `  - **${d.name}** (${d.category.replace(/_/g, ' ')}):
     Outstanding: ₹${d.remainingAmount.toLocaleString('en-IN')}
     Interest Rate: ${d.interestRate}% p.a. (${d.interestType.replace(/_/g, ' ')})
@@ -138,17 +138,12 @@ ${debtDetails}
 
 Format your response in clear Markdown with headers, bullet points, and bold text. Use ₹ symbol for amounts. Keep language simple and actionable. End with a disclaimer.`;
 
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    const completion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: 'You are a professional Indian financial advisor specializing in debt management. Be specific, actionable, and use real numbers from the data.' },
-        { role: 'user', content: prompt },
-      ],
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: 2000,
-    });
+    // Call Google Gemini API
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
-    const aiResponse = completion.choices[0]?.message?.content || "Sorry, couldn't generate advice. Please try again.";
+    const result = await model.generateContent(prompt);
+    const aiResponse = result.response.text() || "Sorry, couldn't generate advice. Please try again.";
     res.json({ response: aiResponse });
 
   } catch (error) {
